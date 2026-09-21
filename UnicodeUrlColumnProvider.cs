@@ -21,7 +21,7 @@ namespace KeeUnicodeURL
 {
 	public sealed class UnicodeUrlColumnProvider : ColumnProvider
 	{
-		private static readonly string[] Columns = new string[] { "URL (Unicode)" };
+		private static readonly string[] Columns = new string[] { "Unicode URL" };
 
 		public override string[] ColumnNames { get { return Columns; } }
 

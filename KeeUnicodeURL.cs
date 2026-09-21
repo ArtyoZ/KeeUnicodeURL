@@ -263,16 +263,30 @@ namespace KeeUnicodeURL
 					}
 				}
 
+				int maxLabelWidth = url.Left - urlCaption.Left - 3;
+
 				state.Label = new Label();
 				state.Label.AutoSize = urlCaption.AutoSize;
 				state.Label.Font = urlCaption.Font;
 				state.Label.Left = urlCaption.Left;
-				state.Label.Width = urlCaption.Width;
+
+				if (maxLabelWidth > 0)
+				{
+					state.Label.AutoSize = false;
+					state.Label.Width = maxLabelWidth;
+				}
+				else
+				{
+					state.Label.AutoSize = urlCaption.AutoSize;
+					state.Label.Width = urlCaption.Width;
+				}
+
 				state.Label.Top = newTop + labelTopOffset;
 				state.Label.Height = urlCaption.Height;
 				state.Label.Anchor = urlCaption.Anchor;
 				state.Label.TextAlign = urlCaption.TextAlign;
-				state.Label.Text = "URL (Unicode):";
+				state.Label.AutoEllipsis = true;
+				state.Label.Text = "Unicode URL";
 				state.Label.Name = "m_lblUnicodeUrl";
 				state.Label.TabIndex = baseTabIndex + 1;
 				state.Label.Visible = false;
