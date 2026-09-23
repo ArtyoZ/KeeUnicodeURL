@@ -83,10 +83,6 @@ namespace KeeUnicodeURL
 			m_host = null;
 		}
 
-		// Official, documented mechanism for a plugin to contribute an item
-		// to KeePass's "Tools" menu - KeePass calls this itself and inserts
-		// the returned item, so (unlike an earlier draft of this file) no
-		// reflection into MainForm's private menu fields is needed here.
 		public override ToolStripMenuItem GetMenuItem(PluginMenuType t)
 		{
 			if(t != PluginMenuType.Main) return null; // Main = the "Tools" menu
@@ -263,37 +259,31 @@ namespace KeeUnicodeURL
 					}
 				}
 
-				int maxLabelWidth = url.Left - urlCaption.Left - 3;
+				const string unicodeUrlLabelText = "Unicode URL:";
+				int availableLabelWidth = url.Left - urlCaption.Left - 3;
+				int requiredLabelWidth = TextRenderer.MeasureText(unicodeUrlLabelText, urlCaption.Font).Width;
+				int fieldLeftDelta = Math.Max(0, requiredLabelWidth - availableLabelWidth);
 
 				state.Label = new Label();
-				state.Label.AutoSize = urlCaption.AutoSize;
+				state.Label.AutoSize = false;
 				state.Label.Font = urlCaption.Font;
 				state.Label.Left = urlCaption.Left;
-
-				if (maxLabelWidth > 0)
-				{
-					state.Label.AutoSize = false;
-					state.Label.Width = maxLabelWidth;
-				}
-				else
-				{
-					state.Label.AutoSize = urlCaption.AutoSize;
-					state.Label.Width = urlCaption.Width;
-				}
-
+				state.Label.Width = availableLabelWidth + fieldLeftDelta;
 				state.Label.Top = newTop + labelTopOffset;
 				state.Label.Height = urlCaption.Height;
 				state.Label.Anchor = urlCaption.Anchor;
 				state.Label.TextAlign = urlCaption.TextAlign;
 				state.Label.AutoEllipsis = true;
-				state.Label.Text = "Unicode URL";
+				state.Label.Text = unicodeUrlLabelText;
 				state.Label.Name = "m_lblUnicodeUrl";
 				state.Label.TabIndex = baseTabIndex + 1;
 				state.Label.Visible = false;
 
+				state.FieldLeftDelta = fieldLeftDelta;
+
 				state.UnicodeUrl = new TextBox();
-				state.UnicodeUrl.Left = url.Left;
-				state.UnicodeUrl.Width = url.Width;
+				state.UnicodeUrl.Left = url.Left + fieldLeftDelta;
+				state.UnicodeUrl.Width = Math.Max(10, url.Width - fieldLeftDelta);
 				state.UnicodeUrl.Top = newTop;
 				state.UnicodeUrl.Height = url.Height;
 				state.UnicodeUrl.Anchor = url.Anchor;
@@ -358,6 +348,22 @@ namespace KeeUnicodeURL
 		private static void InitializeShiftedControls(EntryFormState state)
 		{
 			if (state.InitializedShiftedControls) return;
+
+			// Store the original bounds of every control in the same input column as
+			// the native URL field. When the Unicode URL row is shown, these controls
+			// are moved to the right by the exact amount required by Unicode URL label
+			// and their widths are reduced by the same amount, preserving their right edge.
+			if (state.FieldLeftDelta > 0)
+			{
+				foreach (Control c in state.Tab.Controls)
+				{
+					if (c == state.Label || c == state.UnicodeUrl) continue;
+					if (c.Left != state.Url.Left) continue;
+
+					state.HorizontalShiftedControls.Add(
+						new ControlBounds(c, c.Bounds));
+				}
+			}
 
 			int urlBottom = state.Url.Bottom;
 			int notesBottom = state.NotesControl != null ? state.NotesControl.Bottom : int.MaxValue;
@@ -471,6 +477,32 @@ namespace KeeUnicodeURL
 
 			state.Tab.SuspendLayout();
 
+			if (visible && state.FieldLeftDelta > 0)
+			{
+				foreach (ControlBounds cb in state.HorizontalShiftedControls)
+				{
+					Control c = cb.TargetControl;
+					Rectangle b = cb.Bounds;
+					c.SetBounds(
+						b.Left + state.FieldLeftDelta,
+						b.Top,
+						Math.Max(10, b.Width - state.FieldLeftDelta),
+						b.Height);
+				}
+			}
+			else if (!visible && state.FieldLeftDelta > 0)
+			{
+				foreach (ControlBounds cb in state.HorizontalShiftedControls)
+				{
+					cb.TargetControl.Bounds = cb.Bounds;
+				}
+			}
+
+			// The Unicode URL field always uses exactly the same horizontal bounds
+			// as the native URL field after the horizontal adjustment.
+			state.UnicodeUrl.Left = state.Url.Left;
+			state.UnicodeUrl.Width = state.Url.Width;
+
 			foreach(Control c in state.ShiftedControls)
 			{
 				if (c == state.NotesControl)
@@ -531,7 +563,9 @@ namespace KeeUnicodeURL
 			public bool Visible;
 			public bool IsFormLoaded;
 			public bool InitializedShiftedControls;
+			public int FieldLeftDelta;
 			public readonly List<Control> ShiftedControls = new List<Control>();
+			public readonly List<ControlBounds> HorizontalShiftedControls = new List<ControlBounds>();
 		}
 
 		// Note: the field is named "TargetControl", not "Control" - naming
